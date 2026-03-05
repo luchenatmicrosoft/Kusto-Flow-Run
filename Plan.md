@@ -26,7 +26,32 @@ TraceEvents
 | count
 ```
 
-**Q2: FlowRunEvents** — Full query matching user's provided KQL. All 4 event types, parse customDimensions for flowRunSequenceId, flowKind, durationInMilliseconds, status, statusCode, flowId, flowDisplayName.
+**Q2: FlowRunEvents** — All 4 event types, parse customDimensions fields.
+
+```kql
+TraceEvents
+| where serviceName == 'PowerAutomate.WorkflowsManagement' or serviceName == _serviceName
+| where env_time >= _runStartTime and env_time <= _runEndTime
+| where customDimensions has _flowName and customDimensions has _environmentId
+| where eventName == 'WorkflowRunStart'
+    or eventName == 'WorkflowRunEnd'
+    or eventName == 'WorkflowRunDispatched'
+    or eventName == 'WorkflowRunStartThrottled'
+| parse kind=regex flags=U customDimensions with '"flowRunSequenceId": "'flowRunSequenceId: string'"'
+| parse kind=regex flags=U customDimensions with '"kind": "'flowKind: string'"'
+| parse kind=regex flags=U customDimensions with '"durationInMilliseconds": 'durationInMilliseconds: long','
+| parse kind=regex flags=U customDimensions with '"status": "'status: string'"'
+| parse kind=regex flags=U customDimensions with '"statusCode": "'statusCode: string'"'
+| parse kind=regex flags=U customDimensions with '"flowId": "'flowId: string'"'
+| parse kind=regex flags=U customDimensions with '\\\\"flowDisplayName\\\\":\\\\"'flowDisplayName: string'\\\\"'
+| project env_time, eventName, flowRunSequenceId, status, statusCode, correlationId, activityId, flowKind, durationInMilliseconds, flowId, flowDisplayName, serviceName
+| order by env_time desc
+```
+
+Key notes:
+- Only `WorkflowRunEnd` events have populated `status`, `statusCode`, and `durationInMilliseconds` values
+- `durationInMilliseconds` is parsed as `long` (no quotes in JSON)
+- `flowDisplayName` uses escaped-quote regex (`\\\\"`) because it's nested JSON
 
 ## SKILL.md Workflow
 
